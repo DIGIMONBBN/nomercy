@@ -1,0 +1,196 @@
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local player = game.Players.LocalPlayer
+
+local teleportPoints = {
+	["🎣 ตกปลา"] = Vector3.new(3244.73, 8.80, 1781.68),
+	["💰 ขายของ"] = Vector3.new(2841.57, 14.13, 2081.81),
+	["🪙 ซื้อของ"] = Vector3.new(3044.45, 14.40, 1911.39),
+	["⛏️ ขุดเหมือง"] = Vector3.new(-273.04, -91.57, -2064.34),
+	["💎 โพแร่"] = Vector3.new(-1914.73, 10.92, 3186.98),
+	["🥥 มะพราว"] = Vector3.new(-3321.86, 72.45, 1073.11),
+	["🌲 ไม้"] = Vector3.new(1263.76, 13.98, -1705.76),
+	["🏞️ ณ่า"] = Vector3.new(-2292.05, 233.44, 55.06),
+	["📈 เลเบล"] = Vector3.new(2463.33, 14.24, 569.61),
+	["🏥 โรงบาล"] = Vector3.new(3468.89, 14.14, 2602.57)
+}
+
+local guiOpen = false
+local frame
+
+-- URL key JSON (เปลี่ยนเป็นของคุณ)
+local keyListUrl = "https://raw.githubusercontent.com/YourUser/your-repo/main/userkeys.json"
+
+-- ขอให้เพื่อนกรอก key
+local function requestKey()
+	local textBox = Instance.new("TextBox")
+	textBox.Size = UDim2.new(0, 200, 0, 40)
+	textBox.Position = UDim2.new(0.5, -100, 0.5, -20)
+	textBox.PlaceholderText = "กรุณาใส่ Key ของคุณ"
+	textBox.ClearTextOnFocus = false
+	textBox.Text = ""
+	textBox.Parent = player.PlayerGui
+
+	textBox.FocusLost:Connect(function(enterPressed)
+		if enterPressed then
+			local inputKey = textBox.Text
+			textBox:Destroy()
+			validateKey(inputKey)
+		end
+	end)
+end
+
+-- ฟังก์ชันตรวจสอบ key และเวลาหมดอายุ
+function validateKey(inputKey)
+	local success, data = pcall(function()
+		return HttpService:JSONDecode(game:HttpGet(keyListUrl))
+	end)
+	if not success then
+		warn("❌ โหลด key list ไม่ได้")
+		return
+	end
+
+	local keyData = data[inputKey]
+
+	if not keyData then
+		warn("❌ ไม่พบ key นี้")
+		return
+	end
+
+	local now = os.time()
+	local usedAt = keyData.usedAt or 0
+
+	if usedAt == 0 then
+		-- ยังไม่เคยใช้ key นี้
+		warn("⏳ Key ยังไม่ถูกเปิดใช้งาน กรุณาติดต่อแอดมินเพื่อบันทึกเวลาเริ่มต้น")
+		return
+	end
+
+	local expireAt = usedAt + (24 * 60 * 60) -- 24 ชั่วโมง
+
+	if now > expireAt then
+		warn("⛔ Key หมดอายุแล้ว")
+		return
+	end
+
+	print("✅ Key ใช้งานได้! เหลือเวลาอีก " .. math.floor((expireAt - now)/60) .. " นาที")
+	showGUI()
+end
+
+-- ฟังก์ชันสร้าง GUI teleport
+function showGUI()
+	if frame then
+		frame.Visible = true
+		return
+	end
+
+	local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+	screenGui.Name = "TeleportGUI"
+	screenGui.ResetOnSpawn = false
+
+	frame = Instance.new("Frame", screenGui)
+	frame.Size = UDim2.new(0, 320, 0, 500)
+	frame.Position = UDim2.new(0, 40, 0.5, -250)
+	frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+	frame.BorderSizePixel = 0
+	frame.Active = true
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+	local uiStroke = Instance.new("UIStroke", frame)
+	uiStroke.Color = Color3.fromRGB(0, 170, 255)
+	uiStroke.Thickness = 2
+	uiStroke.Transparency = 0.25
+
+	local titleBar = Instance.new("TextLabel", frame)
+	titleBar.Size = UDim2.new(1, 0, 0, 40)
+	titleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	titleBar.Text = "By NAMPHU"
+	titleBar.TextColor3 = Color3.fromRGB(255, 255, 255)
+	titleBar.Font = Enum.Font.GothamBold
+	titleBar.TextSize = 20
+	Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 10)
+
+	-- Dragging
+	local dragging, dragStart, startPos
+	titleBar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			dragStart = input.Position
+			startPos = frame.Position
+		end
+	end)
+	titleBar.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+		end
+	end)
+	UIS.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			local delta = input.Position - dragStart
+			frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+
+	local scrollFrame = Instance.new("ScrollingFrame", frame)
+	scrollFrame.Position = UDim2.new(0, 10, 0, 50)
+	scrollFrame.Size = UDim2.new(1, -20, 1, -100)
+	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+	scrollFrame.ScrollBarThickness = 6
+	scrollFrame.BackgroundTransparency = 1
+
+	local layout = Instance.new("UIListLayout", scrollFrame)
+	layout.Padding = UDim.new(0, 6)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+	end)
+
+	local function createButton(name)
+		local button = Instance.new("TextButton", scrollFrame)
+		button.Size = UDim2.new(1, 0, 0, 40)
+		button.Text = name
+		button.TextColor3 = Color3.new(1, 1, 1)
+		button.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+		button.Font = Enum.Font.Gotham
+		button.TextSize = 18
+		Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
+
+		local aura = Instance.new("UIStroke", button)
+		aura.Color = Color3.fromRGB(0, 255, 255)
+		aura.Thickness = 1.5
+		aura.Transparency = 0.2
+
+		button.MouseButton1Click:Connect(function()
+			local pos = teleportPoints[name]
+			local char = player.Character or player.CharacterAdded:Wait()
+			local root = char:WaitForChild("HumanoidRootPart")
+			root.CFrame = CFrame.new(pos)
+		end)
+	end
+
+	for name in pairs(teleportPoints) do
+		createButton(name)
+	end
+
+	local credit = Instance.new("TextLabel", frame)
+	credit.Size = UDim2.new(1, 0, 0, 30)
+	credit.Position = UDim2.new(0, 0, 1, -30)
+	credit.BackgroundTransparency = 1
+	credit.Text = "👤 by NAMPHU"
+	credit.TextColor3 = Color3.fromRGB(200, 200, 200)
+	credit.Font = Enum.Font.GothamSemibold
+	credit.TextSize = 14
+end
+
+-- กด Ctrl เปิด/ปิด GUI
+UIS.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+	if input.KeyCode == Enum.KeyCode.LeftControl then
+		if frame then
+			frame.Visible = not frame.Visible
+		end
+	end
+end)
+
+-- เริ่มให้กรอก key ตอนเริ่ม script
+requestKey()
